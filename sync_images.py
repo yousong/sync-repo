@@ -25,7 +25,7 @@ def match_tag(tag):
 
 def help():
     print('python sync_images -h|--help')
-    print('python sync_images [-f|--file <config_file>] [-r|--registry <host:port>] [-n|--namespace] [-i|--insecure_registry] [-d|--days=15]')
+    print('python sync_images [-f|--file <config_file>] [-r|--registry <host:port>] [-n|--namespace] [-i|--insecure_registry] [-d|--days 15]')
     sys.exit(1)
 
 
