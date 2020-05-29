@@ -1,13 +1,15 @@
-#!/usr/bin/python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+
 import docker
+import dateutil.parser
+
 import sys
 import getopt
 import traceback
 import requests
 import datetime
 import time
-import dateutil.parser
 import re
 import subprocess
 import json
