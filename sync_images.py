@@ -133,7 +133,7 @@ def sync_repo(client, registry, namespace, insecure_registry, repo, newName):
             print('Tagging %s:%s %s:%s' % (repo, tag, new_repo_name, tag))
             image.tag(new_repo_name, tag)
             print('Pushing repository %s:%s ...' % (new_repo_name, tag))
-            client.images.push(new_repo_name, tag=tag)
+            print(client.images.push(new_repo_name, tag=tag))
         except Exception:
             traceback.print_exc()
     print('Complete the sync of repository %s' % repo)
