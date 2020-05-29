@@ -2,7 +2,6 @@
 # -*- coding: utf-8 -*-
 import docker
 import sys
-import os
 import getopt
 import traceback
 import requests
@@ -173,11 +172,13 @@ for option in options:
     elif option[0] == '-h' or option[0] == '--help':
         help()
 
-if not os.path.exists(filename):
-    print >> sys.stderr, 'Cannot file configuration for image sync: %s' \
-        % filename
+try:
+    with open(filename) as fin:
+        lines = [line.strip() for line in fin.readlines()]
+except Exception as ex:
+    print >> sys.stderr, 'Read configuration %s for image sync: %s' \
+        % (filename, ex)
     sys.exit(1)
-lines = [line.strip() for line in open(filename)]
 
 print('Syncing images within %d days ...' % days)
 # client = docker.Client(docker_host)
