@@ -32,7 +32,7 @@ def match_tag(tag):
 
 def help():
     print('python sync_images -h|--help')
-    print('python sync_images [-f|--file <config_file>] [-r|--registry <host:port>] [-n|--namespace] [-i|--insecure_registry] [-d|--days 15]')
+    print('python sync_images [-f|--file <config_file>] [-r|--registry <host:port>] [-n|--namespace] [-i|--insecure_registry] [-d|--days 15] [-c|--recents 0]')
     sys.exit(1)
 
 
@@ -126,8 +126,9 @@ def list_repo_tags(client, repo):
                     continue
                 tag_set.add(Tag(tag, timeUpload))
 
-    for tag in tag_set:
-        if tag.ts > timestamp:
+    tag_list = sorted(tag_set, key=lambda t: t.ts, reverse=True)
+    for tag in tag_list:
+        if tag.ts > timestamp or len(result) < recents:
             result.append(tag.name)
     return result
 
@@ -160,15 +161,17 @@ DEFAULT_REGISTRY = 'registry.cn-hangzhou.aliyuncs.com'
 DEFAULT_NAMESPACE = 'google_containers'
 INSECURE_REGISTRY = False
 DEFAULT_DAYS = 15
+DEFAULT_RECENTS = 0
 
 docker_host = None
 insecure_registry = INSECURE_REGISTRY
 filename = DEFAULT_CONFIG_FILE
 days = DEFAULT_DAYS
+recents = DEFAULT_RECENTS
 # parse command line arguments
 
 try:
-    (options, args) = getopt.getopt(sys.argv[1:], 'f:d:r:n:ih', ['file=', 'days=', 'registry=', 'namespace=', 'insecure_registry', 'help'])
+    (options, args) = getopt.getopt(sys.argv[1:], 'f:d:c:r:n:ih', ['file=', 'days=', "recents=", 'registry=', 'namespace=', 'insecure_registry', 'help'])
 except getopt.GetoptError:
     help()
 namespace = DEFAULT_NAMESPACE
@@ -184,6 +187,8 @@ for option in options:
         insecure_registry = True
     elif option[0] == '-d' or option[0] == '--days':
         days = int(option[1])
+    elif option[0] == '-c' or option[0] == '--recents':
+        recents = int(option[1])
     elif option[0] == '-h' or option[0] == '--help':
         help()
 
