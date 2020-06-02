@@ -65,42 +65,50 @@ def searchTagsWith(cmd, key):
     logging.info('Search repository %s with cmd %s ...' % (repo, cmd))
     return json.loads(output).get("data").get(key, [])
 
+class Tag(object):
+    def __init__(self, name, ts):
+        self.name = name
+        self.ts = ts
+
+    def __hash__(self):
+        return hash(self.name)
+
+    def __eq__(self, tag1):
+        return self.name == tag1.name
+
 def list_repo_tags(client, repo):
     result = []
     repo_names = normalize_repo(repo)
     timestamp = time.mktime((datetime.date.today() - datetime.timedelta(days=days)).timetuple()) * 1000
+    tag_set = set()
     if repo_names[0] == 'docker.io':
         url = "https://registry.hub.docker.com/v2/repositories/%s/%s/tags/?page_size=1024" % (repo_names[1], repo_names[2])
         tags = searchTags(url, 'results')
         for image in tags:
             timeUpload = time.mktime(dateutil.parser.parse(image['last_updated']).timetuple())*1000
             tag = image['name']
-            if len(tags) > 0 and timeUpload > timestamp:
-                result.append(tag)
+            if len(tag) > 0:
+                tag_set.add(Tag(tag, timeUpload))
     elif repo_names[0] == 'quay.io':
         url = 'https://quay.io/api/v1/repository/%s/%s/tag/' % (repo_names[1], repo_names[2])
         tags = searchTags(url, 'tags')
         for image in tags:
             timeUpload = float(image['start_ts']) * 1000
             tag = image['name']
-            if len(tags) > 0 and timeUpload > timestamp:
-                result.append(tag)
+            if len(tag) > 0:
+                tag_set.add(Tag(tag, timeUpload))
     elif repo_names[0].endswith("aliyuncs.com"):
         # url = 'https://quay.io/api/v1/repository/%s/%s/tag/' % (repo_names[1], repo_names[2])
         # | jq '.data'
         endpoint = repo_names[0].split(".")[1]
         cmd = "aliyun cr GET  /repos/%s/%s/tags --endpoint cr.%s.aliyuncs.com"  % (repo_names[1], repo_names[2], endpoint)
         tags = searchTagsWith(cmd, 'tags')
-        if len(tags) > 0:
-            logging.info("Sync repo %s/%s: " % (repo_names[1], repo_names[2]))
         for image in tags:
             timeUpload = float(image['imageUpdate']) #* 1000
             tag = image['tag']
-            # logging.info("image tags: %s, timeUpload: %s, start_time %s" % (tag, timeUpload, timestamp))
-            # Only list the layer with tag and later than timestamp
-            if len(tags) > 0 and timeUpload > timestamp:
-                logging.info("image tags: %s, timeUpload: %s, start_time %s" % (tag, timeUpload, timestamp))
-                result.append(tag)
+            # Only list the layer with tag
+            if len(tag) > 0:
+                tag_set.add(Tag(tag, timeUpload))
     else:
         if repo_names[1] == '':
             url = 'https://%s/v2/%s/tags/list' % (repo_names[0], repo_names[2])
@@ -112,15 +120,15 @@ def list_repo_tags(client, repo):
             timeUpload = float(image[u'timeUploadedMs'])
             tags = image[u'tag']
 
-            # Only list the layer with tag and later than timestamp
-            if len(tags) > 0 and timeUpload > timestamp:
-                for tag in tags:
-                    # Ignore the canary and alpha images
-                    if not match_tag(tag):
-                        logging.info('Tags %s uploaded %s' % (tag, image[u'timeUploadedMs']))
-                        result.append(tag)
+            for tag in tags:
+                # Ignore the canary and alpha images
+                if len(tag) == 0 or match_tag(tag):
+                    continue
+                tag_set.add(Tag(tag, timeUpload))
 
-    result = list(set(result))
+    for tag in tag_set:
+        if tag.ts > timestamp:
+            result.append(tag.name)
     return result
 
 
