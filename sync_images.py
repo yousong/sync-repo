@@ -7,7 +7,6 @@ import dateutil.parser
 import logging
 import sys
 import getopt
-import traceback
 import requests
 import datetime
 import time
@@ -204,7 +203,7 @@ def thread_pull():
 
             queue_push.put(args)
         except Exception:
-            traceback.print_exc()
+            logging.exception("when pulling/tagging %s" % (args, ))
 
 def thread_push():
     client = docker.from_env()
@@ -213,9 +212,12 @@ def thread_push():
         if args is None:
             return
         repo, new_repo, tag = args
-        logging.info('Pushing %s:%s' % (new_repo, tag))
-        client.images.push(new_repo, tag=tag)
-        logging.info('Pushing done: %s:%s' % (new_repo, tag))
+        try:
+            logging.info('Pushing %s:%s' % (new_repo, tag))
+            client.images.push(new_repo, tag=tag)
+            logging.info('Pushing done: %s:%s' % (new_repo, tag))
+        except:
+            logging.exception("when pushing %s" % (args, ))
 
 pull_threads = [threading.Thread(target=thread_pull) for i in range(nt)]
 for t in pull_threads:
@@ -249,7 +251,7 @@ for line in lines:
             new_repo = repo_names[2]
         sync_repo(client, registry, ns, insecure_registry, repo, new_repo)
     except Exception:
-        traceback.print_exc()
+        logging.exception("processing line %s" % line)
 
 for i in range(nt):
     queue_pull.put(None)
