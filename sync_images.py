@@ -14,7 +14,12 @@ import re
 import subprocess
 import json
 import threading
-import queue
+try:
+    import queue
+except:
+    # py2 compat
+    import Queue as queue
+
 
 
 logging.getLogger().setLevel(logging.INFO)
