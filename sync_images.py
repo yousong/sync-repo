@@ -4,6 +4,7 @@
 import docker
 import dateutil.parser
 
+import logging
 import sys
 import getopt
 import traceback
@@ -16,6 +17,8 @@ import json
 import threading
 import queue
 
+
+logging.getLogger().setLevel(logging.INFO)
 
 tag_filters = ['git-.*', 'canary$', 'dev$', 'dev-.*', 'build-.*', '.*-dirty$', '.*-alpha.*', '.*-beta.*', '.*-rc.*']
 
@@ -47,11 +50,11 @@ def normalize_repo(repo):
 
 def searchTags(url, key):
     r = requests.get(url)
-    print('Search repository %s from url %s ...' % (repo, url))
+    logging.info('Search repository %s from url %s ...' % (repo, url))
     if r.status_code == 200:
         return r.json().get(key, [])
     else:
-        print('Failed to list image tags with error code:%d message:%s' % (r.status_code, r.text))
+        logging.info('Failed to list image tags with error code:%d message:%s' % (r.status_code, r.text))
         return {}
 
 def run(cmd):
@@ -59,7 +62,7 @@ def run(cmd):
 
 def searchTagsWith(cmd, key):
     output = run(cmd)
-    print('Search repository %s with cmd %s ...' % (repo, cmd))
+    logging.info('Search repository %s with cmd %s ...' % (repo, cmd))
     return json.loads(output).get("data").get(key, [])
 
 def list_repo_tags(client, repo):
@@ -89,14 +92,14 @@ def list_repo_tags(client, repo):
         cmd = "aliyun cr GET  /repos/%s/%s/tags --endpoint cr.%s.aliyuncs.com"  % (repo_names[1], repo_names[2], endpoint)
         tags = searchTagsWith(cmd, 'tags')
         if len(tags) > 0:
-            print("Sync repo %s/%s: " % (repo_names[1], repo_names[2]))
+            logging.info("Sync repo %s/%s: " % (repo_names[1], repo_names[2]))
         for image in tags:
             timeUpload = float(image['imageUpdate']) #* 1000
             tag = image['tag']
-            # print("image tags: %s, timeUpload: %s, start_time %s" % (tag, timeUpload, timestamp))
+            # logging.info("image tags: %s, timeUpload: %s, start_time %s" % (tag, timeUpload, timestamp))
             # Only list the layer with tag and later than timestamp
             if len(tags) > 0 and timeUpload > timestamp:
-                print("image tags: %s, timeUpload: %s, start_time %s" % (tag, timeUpload, timestamp))
+                logging.info("image tags: %s, timeUpload: %s, start_time %s" % (tag, timeUpload, timestamp))
                 result.append(tag)
     else:
         if repo_names[1] == '':
@@ -114,7 +117,7 @@ def list_repo_tags(client, repo):
                 for tag in tags:
                     # Ignore the canary and alpha images
                     if not match_tag(tag):
-                        print('Tags %s uploaded %s' % (tag, image[u'timeUploadedMs']))
+                        logging.info('Tags %s uploaded %s' % (tag, image[u'timeUploadedMs']))
                         result.append(tag)
 
     result = list(set(result))
@@ -122,25 +125,25 @@ def list_repo_tags(client, repo):
 
 
 def sync_repo(client, registry, namespace, insecure_registry, repo, newName):
-    print('Syncing repository %s ...' % repo)
+    logging.info('Syncing repository %s ...' % repo)
     tags = list_repo_tags(client, repo)
 
     new_repo_name = registry + '/' + namespace + '/' + newName
 
-    print('Original repository is %s' % repo)
-    print('New repository is %s' % new_repo_name)
+    logging.info('Original repository is %s' % repo)
+    logging.info('New repository is %s' % new_repo_name)
 
     for tag in tags:
         try:
-            print('Pulling %s:%s' % (repo, tag))
+            logging.info('Pulling %s:%s' % (repo, tag))
             image = client.images.pull(repo, tag=tag)
-            print('Tagging %s:%s %s:%s' % (repo, tag, new_repo_name, tag))
+            logging.info('Tagging %s:%s %s:%s' % (repo, tag, new_repo_name, tag))
             image.tag(new_repo_name, tag)
-            print('Pushing repository %s:%s ...' % (new_repo_name, tag))
-            print(client.images.push(new_repo_name, tag=tag))
+            logging.info('Pushing repository %s:%s ...' % (new_repo_name, tag))
+            logging.info(client.images.push(new_repo_name, tag=tag))
         except Exception:
             traceback.print_exc()
-    print('Complete the sync of repository %s' % repo)
+    logging.info('Complete the sync of repository %s' % repo)
 
 
 options = []
@@ -180,11 +183,11 @@ try:
     with open(filename) as fin:
         lines = [line.strip() for line in fin.readlines()]
 except Exception as ex:
-    print >> sys.stderr, 'Read configuration %s for image sync: %s' \
-        % (filename, ex)
+    logging.error('Read configuration %s for image sync: %s' \
+        % (filename, ex))
     sys.exit(1)
 
-print('Syncing images within %d days ...' % days)
+logging.info('Syncing images within %d days ...' % days)
 # client = docker.Client(docker_host)
 
 q = queue.Queue()
