@@ -13,6 +13,8 @@ import time
 import re
 import subprocess
 import json
+import threading
+import queue
 
 
 tag_filters = ['git-.*', 'canary$', 'dev$', 'dev-.*', 'build-.*', '.*-dirty$', '.*-alpha.*', '.*-beta.*', '.*-rc.*']
@@ -185,7 +187,20 @@ except Exception as ex:
 print('Syncing images within %d days ...' % days)
 # client = docker.Client(docker_host)
 
-client = docker.from_env()
+q = queue.Queue()
+def thread_sync_repo():
+    client = docker.from_env()
+    while True:
+        args = q.get()
+        if args is None:
+            return
+        sync_repo(client, *args)
+
+nt = 8
+ts = [threading.Thread(target=thread_sync_repo) for i in range(nt)]
+for t in ts:
+    t.start()
+
 
 for line in lines:
 
@@ -209,6 +224,12 @@ for line in lines:
             registry = repo_names[0]
             ns = repo_names[1]
             new_repo = repo_names[2]
-        sync_repo(client, registry, ns, insecure_registry, repo, new_repo)
+        q.put(item=(registry, ns, insecure_registry, repo, new_repo))
     except Exception:
         traceback.print_exc()
+
+for i in range(nt):
+    q.put(None)
+
+for t in ts:
+    t.join()
