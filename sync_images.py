@@ -134,25 +134,10 @@ def list_repo_tags(client, repo):
 
 
 def sync_repo(client, registry, namespace, insecure_registry, repo, newName):
-    logging.info('Syncing repository %s ...' % repo)
     tags = list_repo_tags(client, repo)
-
-    new_repo_name = registry + '/' + namespace + '/' + newName
-
-    logging.info('Original repository is %s' % repo)
-    logging.info('New repository is %s' % new_repo_name)
-
+    new_repo = registry + '/' + namespace + '/' + newName
     for tag in tags:
-        try:
-            logging.info('Pulling %s:%s' % (repo, tag))
-            image = client.images.pull(repo, tag=tag)
-            logging.info('Tagging %s:%s %s:%s' % (repo, tag, new_repo_name, tag))
-            image.tag(new_repo_name, tag)
-            logging.info('Pushing repository %s:%s ...' % (new_repo_name, tag))
-            logging.info(client.images.push(new_repo_name, tag=tag))
-        except Exception:
-            traceback.print_exc()
-    logging.info('Complete the sync of repository %s' % repo)
+        queue_pull.put((repo, new_repo, tag))
 
 
 options = []
@@ -200,32 +185,54 @@ except Exception as ex:
         % (filename, ex))
     sys.exit(1)
 
-logging.info('Syncing images within %d days ...' % days)
-# client = docker.Client(docker_host)
-
-q = queue.Queue()
-def thread_sync_repo():
+nt = 4
+queue_pull = queue.Queue(maxsize=nt)
+queue_push = queue.Queue(maxsize=nt*2)
+def thread_pull():
     client = docker.from_env()
     while True:
-        args = q.get()
+        args = queue_pull.get()
         if args is None:
             return
-        sync_repo(client, *args)
+        repo, new_repo, tag = args
+        try:
+            logging.info('Pulling %s:%s' % (repo, tag))
+            image = client.images.pull(repo, tag=tag)
 
-nt = 8
-ts = [threading.Thread(target=thread_sync_repo) for i in range(nt)]
-for t in ts:
+            logging.info('Tagging %s:%s' % (new_repo, tag))
+            image.tag(new_repo, tag)
+
+            queue_push.put(args)
+        except Exception:
+            traceback.print_exc()
+
+def thread_push():
+    client = docker.from_env()
+    while True:
+        args = queue_push.get()
+        if args is None:
+            return
+        repo, new_repo, tag = args
+        logging.info('Pushing %s:%s' % (new_repo, tag))
+        client.images.push(new_repo, tag=tag)
+        logging.info('Pushing done: %s:%s' % (new_repo, tag))
+
+pull_threads = [threading.Thread(target=thread_pull) for i in range(nt)]
+for t in pull_threads:
+    t.start()
+push_threads = [threading.Thread(target=thread_push) for i in range(nt)]
+for t in push_threads:
     t.start()
 
 
+client = docker.from_env()
 for line in lines:
-
     # Ignore comment
-
     if line.startswith('#'):
         continue
     if line == '':
         continue
+
     try:
         ns = namespace
         repos = line.split("=")
@@ -240,12 +247,14 @@ for line in lines:
             registry = repo_names[0]
             ns = repo_names[1]
             new_repo = repo_names[2]
-        q.put(item=(registry, ns, insecure_registry, repo, new_repo))
+        sync_repo(client, registry, ns, insecure_registry, repo, new_repo)
     except Exception:
         traceback.print_exc()
 
 for i in range(nt):
-    q.put(None)
+    queue_pull.put(None)
+for i in range(nt):
+    queue_push.put(None)
 
-for t in ts:
+for t in pull_threads:
     t.join()
