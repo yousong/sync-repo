@@ -13,7 +13,7 @@ import subprocess
 import json
 
 
-tag_filters = ['git-.*', 'canary$', 'dev$', 'dev-.*', 'build-.*', '.*-alpha.*', '.*-beta.*', '.*-rc.*']
+tag_filters = ['git-.*', 'canary$', 'dev$', 'dev-.*', 'build-.*', '.*-dirty$', '.*-alpha.*', '.*-beta.*', '.*-rc.*']
 
 
 def match_tag(tag):
