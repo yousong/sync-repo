@@ -19,7 +19,9 @@ import queue
 
 logging.getLogger().setLevel(logging.INFO)
 
-tag_filters = ['git-.*', 'canary$', 'dev$', 'dev-.*', 'build-.*', '.*-dirty$', '.*-alpha.*', '.*-beta.*', '.*-rc.*']
+tag_filters = ['git-.*', 'canary$', 'dev$', 'dev-.*', 'build-.*', '.*-dirty$']
+tag_filters += ['^master-.*'] # zeppelin
+tag_filters += ['.*-alpha.*', '.*-beta.*', '.*-rc.*']
 
 
 def match_tag(tag):
